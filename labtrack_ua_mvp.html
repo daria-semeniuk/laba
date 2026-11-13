@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LabTrack UA — Планувальник лабораторних та дедлайнів (MVP)</title>
+    <!-- Підключення Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Підключення шрифту Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Кастомні стилі для плавності в стилі Linear / Notion */
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .card-hover {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+        }
+        .tab-active {
+            background-color: #4f46e5;
+            color: #ffffff;
+            box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+        }
+        .tab-inactive {
+            color: #475569;
+        }
+        .tab-inactive:hover {
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+        /* Плавна поява модальних вікон та секцій */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.25s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-100 selection:text-brand-900">
+
+    <!-- ВЕРХНЯ НАВІГАЦІЯ З ПЕРЕМИКАЧЕМ РОЛЕЙ (B2B2C ДЕМО-ПАНЕЛЬ) -->
+    <header class="glass-nav sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between py-3 gap-3">
+                <!-- Логотип -->
+                <div class="flex items-center gap-3 w-full md:w-auto justify-between">
+                    <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchRole('landing')">
+                        <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold shadow-sm">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold text-lg tracking-tight text-slate-900">LabTrack</span>
+                                <span class="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-brand-50 text-brand-700 border border-brand-200">MVP</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 hidden sm:block">Розумний трекер дедлайнів для ЗВО</p>
+                        </div>
+                    </div>
+                    <!-- Кнопка швидкого виклику Cookie налаштувань для демонстрації GDPR -->
+                    <button onclick="openCookieBanner()" class="md:hidden text-xs text-slate-500 underline">GDPR Cookie</button>
+                </div>
+
+                <!-- Перемикач ролей для захисту проєкту -->
+                <nav class="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 w-full md:w-auto overflow-x-auto" aria-label="Перемикач ролей">
+                    <button id="btn-role-student" onclick="switchRole('student')" class="tab-active flex-1 md:flex-none flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap">
+                        <span>🎓 Кабінет студента</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded bg-white/20 font-semibold">Free</span>
+                    </button>
+                    <button id="btn-role-department" onclick="switchRole('department')" class="tab-inactive flex-1 md:flex-none flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap">
+                        <span>🏛️ Панель кафедри</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-semibold">Pro $120/міс</span>
+                    </button>
+                    <button id="btn-role-landing" onclick="switchRole('landing')" class="tab-inactive flex-1 md:flex-none flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap">
+                        <span>🚀 Продукт і Тарифи</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- КОНТЕЙНЕР ПОВІДОМЛЕНЬ (TOAST NOTIFICATIONS ЗАМІСТЬ ALERT) -->
+    <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- ГОЛОВНИЙ КОНТЕНТ -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+
+        <!-- ===================================================================== -->
+        <!-- 1. РЕЖИМ: КАБІНЕТ СТУДЕНТА (FREE B2C)                                 -->
+        <!-- ===================================================================== -->
+        <section id="view-student" class="animate-fade-in space-y-6">
+            <!-- Верхній банер профілю та дій -->
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-sm">
+                <div class="space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Група ІПЗ-31 (Кафедра ПЗ)
+                        </span>
+                        <span class="text-xs text-slate-400">Осінній семестр 2026</span>
+                    </div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Привіт, Олександре! 👋</h1>
+                    <p class="text-sm text-slate-600">Система автоматично розбила твої лабораторні на етапи, щоб уникнути нічних дедлайнів.</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Віральний механізм Referral (з ЛР 7 та ЛР 16) -->
+                    <button onclick="inviteGroup()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 transition">
+                        <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        <span>Запросити групу в 1 клік</span>
+                    </button>
+
+                    <!-- Ключова кнопка УТП -->
+                    <button onclick="openAddLabModal()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white shadow-sm shadow-brand-600/20 transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        <span>Додати лабораторну / курсову</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Попередження про перетин 3+ робіт (виявлений біль з Customer Development ЛР 7) -->
+            <div id="overload-alert" class="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-amber-900">Увага: виявлено перетин <span id="active-labs-count">3</span> активних робіт на цьому тижні!</h3>
+                        <p class="text-xs sm:text-sm text-amber-800 mt-0.5">Щоб не втратити бали за прострочення, виконуй проміжні етапи за рекомендованим графіком нижче.</p>
+                    </div>
+                </div>
+                <span class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-200/70 text-amber-900 whitespace-nowrap">Ризик: Високий</span>
+            </div>
+
+            <!-- Картки метрик студента -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Прогрес семестру</span>
+                        <span class="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md" id="overall-progress-badge">46%</span>
+                    </div>
+                    <div class="mt-3 flex items-baseline gap-2">
+                        <span class="text-2xl font-extrabold text-slate-900" id="completed-steps-text">6 з 13</span>
+                        <span class="text-xs text-slate-500">етапів виконано</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2 mt-3 overflow-hidden">
+                        <div id="overall-progress-bar" class="bg-brand-600 h-2 rounded-full transition-all duration-300" style="width: 46%"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Найближчий фінальний дедлайн</span>
+                        <span class="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">Через 3 дні</span>
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-base font-bold text-slate-900 truncate">Бази даних — Лаб №4</div>
+                        <p class="text-xs text-slate-500 mt-1">Залишився 1 етап: Оформлення звіту та захист</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Синхронізація з кафедрою</span>
+                        <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">Активна</span>
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-base font-bold text-slate-900">Кафедра інженерії ПЗ</div>
+                        <p class="text-xs text-slate-500 mt-1">Дедлайни викладачів підтягуються автоматично</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Фільтр статусів -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <h2 class="text-lg font-bold text-slate-900">Мої навчальні роботи та етапи</h2>
+                <div class="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 text-xs font-medium">
+                    <button onclick="filterLabs('all')" id="filter-all" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white transition">Усі</button>
+                    <button onclick="filterLabs('active')" id="filter-active" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition">У процесі</button>
+                    <button onclick="filterLabs('done')" id="filter-done" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition">Здано</button>
+                </div>
+            </div>
+
+            <!-- Список карток лабораторних робіт -->
+            <div id="labs-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <!-- Генерується динамічно через JS -->
+            </div>
+        </section>
+
+        <!-- ===================================================================== -->
+        <!-- 2. РЕЖИМ: ПАНЕЛЬ КАФЕДРИ / ВИКЛАДАЧА (PRO B2B — $120/МІС)             -->
+        <!-- ===================================================================== -->
+        <section id="view-department" class="hidden animate-fade-in space-y-6">
+            <!-- Шапка панелі кафедри -->
+            <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div class="space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-brand-50 text-brand-700 border border-brand-200">Ліцензія Кафедри Pro ($120/міс)</span>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200" title="Згідно з DPIA (ЛР 9), показуються агреговані дані для уникнення тиску на студентів">
+                            🛡️ GDPR & DPIA Safe Mode
+                        </span>
+                    </div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Кафедра інженерії програмного забезпечення</h1>
+                    <p class="text-sm text-slate-600">Агрегований моніторинг виконання лабораторних робіт та управління груповими дедлайнами.</p>
+                </div>
+
+                <button onclick="openGroupDeadlineModal()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white shadow-sm transition whitespace-nowrap">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span>+ Створити дедлайн для групи</span>
+                </button>
+            </div>
+
+            <!-- Примітка про дотримання DPIA (з ЛР 9) -->
+            <div class="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
+                <svg class="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="text-xs sm:text-sm text-blue-900">
+                    <span class="font-semibold">Приватність за замовчуванням (DPIA, ст. 35 GDPR):</span> Для захисту студентів від мікроменеджменту викладач бачить <strong>агреговану статистику по групах</strong> та виявлені «вузькі місця» на етапах. Персональний прогрес доступний лише для студентів, які добровільно надали згоду на менторство (78% потоку).
+                </div>
+            </div>
+
+            <!-- KPI Кафедри -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                    <span class="text-xs font-medium text-slate-500">Активних студентів</span>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span class="text-2xl font-extrabold text-slate-900">248</span>
+                        <span class="text-xs font-semibold text-emerald-600">+18% за місяць</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">8 академічних груп</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                    <span class="text-xs font-medium text-slate-500">Вчасна здача робіт</span>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span class="text-2xl font-extrabold text-slate-900">84.2%</span>
+                        <span class="text-xs font-semibold text-emerald-600">+29% до впровадження</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">Середній показник по кафедрі</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                    <span class="text-xs font-medium text-slate-500">Головне «вузьке місце»</span>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span class="text-lg font-bold text-rose-600">Етап 3: Тестування</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">34% студентів застрягають тут</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm">
+                    <span class="text-xs font-medium text-slate-500">Економія часу викладачів</span>
+                    <div class="mt-2 flex items-baseline justify-between">
+                        <span class="text-2xl font-extrabold text-brand-600">~14 год/тиж</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">Менше перевірок у ніч перед сесією</p>
+                </div>
+            </div>
+
+            <!-- Аналітика по групах та Вузькі місця -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Таблиця груп -->
+                <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                        <h2 class="font-bold text-slate-900">Агрегований прогрес академічних груп</h2>
+                        <span class="text-xs text-slate-500">Оновлено щойно</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50/80 text-xs font-semibold text-slate-500 uppercase border-b border-slate-200/80">
+                                    <th class="py-3 px-4">Група</th>
+                                    <th class="py-3 px-4">Студентів</th>
+                                    <th class="py-3 px-4">Середній прогрес</th>
+                                    <th class="py-3 px-4">Статус дедлайнів</th>
+                                </tr>
+                            </thead>
+                            <tbody id="groups-table-body" class="divide-y divide-slate-100 text-sm">
+                                <!-- Заповнюється через JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Аналіз вузьких місць по етапах -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <h2 class="font-bold text-slate-900">Де студенти застрягають?</h2>
+                        <p class="text-xs text-slate-500 mt-1">Розподіл затримок за етапами виконання лабораторних робіт</p>
+
+                        <div class="mt-5 space-y-4">
+                            <div>
+                                <div class="flex justify-between text-xs font-medium mb-1">
+                                    <span class="text-slate-700">1. Аналіз вимог та середовище</span>
+                                    <span class="text-slate-500">12% затримок</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2 rounded-full">
+                                    <div class="bg-emerald-500 h-2 rounded-full" style="width: 12%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs font-medium mb-1">
+                                    <span class="text-slate-700">2. Реалізація базової логіки</span>
+                                    <span class="text-slate-500">28% затримок</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2 rounded-full">
+                                    <div class="bg-amber-500 h-2 rounded-full" style="width: 28%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs font-medium mb-1">
+                                    <span class="text-rose-700 font-semibold">3. Тестування та виправлення багів</span>
+                                    <span class="text-rose-600 font-bold">42% затримок</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2 rounded-full">
+                                    <div class="bg-rose-500 h-2 rounded-full" style="width: 42%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs font-medium mb-1">
+                                    <span class="text-slate-700">4. Оформлення звіту та захист</span>
+                                    <span class="text-slate-500">18% затримок</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2 rounded-full">
+                                    <div class="bg-brand-500 h-2 rounded-full" style="width: 18%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t border-slate-100">
+                        <div class="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl">
+                            💡 <strong>Рекомендація системи:</strong> Провести коротку консультацію з юніт-тестування для групи <strong>КН-32</strong> перед здачею Лаб №3.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================== -->
+        <!-- 3. РЕЖИМ: ПРО ПРОДУКТ І ТАРИФИ (ЛЕНДІНГ + А/Б ТЕСТ + ОНБОРДИНГ)       -->
+        <!-- ===================================================================== -->
+        <section id="view-landing" class="hidden animate-fade-in space-y-12 pb-8">
+            <!-- Hero секція із заголовком-переможцем A/B тесту (ЛР 16) -->
+            <div class="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-10 lg:p-12 shadow-sm relative overflow-hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                    <div class="lg:col-span-7 space-y-5">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold">
+                            <span>✨ Спеціалізований EdTech SaaS для університетів України</span>
+                        </div>
+                        <!-- Заголовок з A/B-тесту ЛР 16 -->
+                        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                            Планувальник, що сам розбиває лабораторну на етапи
+                        </h1>
+                        <p class="text-base sm:text-lg text-slate-600 max-w-2xl leading-relaxed">
+                            Забудь про хаос у Notion та курсові в останню ніч. Введи тему та дедлайн — алгоритм автоматично створить покроковий план із проміжними датами, а кафедра бачитиме прогрес без мікроменеджменту.
+                        </p>
+                        <div class="flex flex-wrap items-center gap-3 pt-2">
+                            <button onclick="switchRole('student')" class="px-6 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-md shadow-brand-600/20 transition">
+                                Спробувати безкоштовно (Студент)
+                            </button>
+                            <button onclick="switchRole('department')" class="px-6 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-sm transition">
+                                Демо для кафедри ($120/міс)
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-6 pt-3 text-xs text-slate-500">
+                            <span class="flex items-center gap-1.5">✅ Безкоштовно для студентів назавжди</span>
+                            <span class="flex items-center gap-1.5">✅ Перший пілотний семестр для кафедр — 0$</span>
+                        </div>
+                    </div>
+
+                    <!-- Інтерактивний міні-калькулятор онбордингу (Тест 2 з ЛР 16: шаблон 4 етапів) -->
+                    <div class="lg:col-span-5 bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Миттєвий тест алгоритму</span>
+                            <span class="text-[11px] bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-500">Шаблон: 4 етапи</span>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Назва роботи</label>
+                            <input type="text" id="demo-calc-title" value="Курсова робота: Веб-додаток на React" oninput="updateDemoCalculator()" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Скільки днів до здачі?</label>
+                            <div class="flex items-center gap-3">
+                                <input type="range" id="demo-calc-days" min="4" max="30" value="14" oninput="updateDemoCalculator()" class="w-full accent-brand-600 cursor-pointer">
+                                <span id="demo-calc-days-label" class="text-sm font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-lg whitespace-nowrap">14 днів</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 space-y-2.5" id="demo-calc-result">
+                            <!-- Заповнюється автоматично -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Порівняння з конкурентами (з ЛР 15) -->
+            <div class="space-y-4">
+                <div class="text-center max-w-2xl mx-auto">
+                    <h2 class="text-2xl font-bold text-slate-900">Чому не Notion чи Trello?</h2>
+                    <p class="text-sm text-slate-600 mt-1">Універсальні трекери вимагають довгого ручного налаштування і не розуміють навчального циклу ЗВО.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200">
+                        <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold mb-3">⚡</div>
+                        <h3 class="font-bold text-slate-900">Авто-декомпозиція за 5 секунд</h3>
+                        <p class="text-xs sm:text-sm text-slate-600 mt-1.5">Замість порожнього екрана студент отримує готові 4 етапи з ваговими коефіцієнтами (15% / 40% / 25% / 20%) та нагадуваннями.</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold mb-3">🎓</div>
+                        <h3 class="font-bold text-slate-900">Синхронізація академічної групи</h3>
+                        <p class="text-xs sm:text-sm text-slate-600 mt-1.5">Староста або викладач створює дедлайн один раз — і він з’являється у всіх студентів групи в один клік.</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200">
+                        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold mb-3">📊</div>
+                        <h3 class="font-bold text-slate-900">Аналітика без стресу (GDPR)</h3>
+                        <p class="text-xs sm:text-sm text-slate-600 mt-1.5">Кафедра вчасно бачить, на якому етапі виникають складнощі у потоку, не перетворюючи систему на тотальний контроль.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Тарифна сітка (B2B2C модель з ЛР 5, 7, 11, 15) -->
+            <div class="space-y-6">
+                <div class="text-center max-w-2xl mx-auto">
+                    <h2 class="text-2xl font-bold text-slate-900">Прозора B2B2C модель монетизації</h2>
+                    <p class="text-sm text-slate-600 mt-1">Студенти користуються безкоштовно, а навчальні заклади оплачують ліцензію за автоматизацію та аналітику.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                    <!-- Тариф 1: Студент Free -->
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Для студентів (B2C)</span>
+                            <h3 class="text-xl font-bold text-slate-900 mt-1">Student Free</h3>
+                            <div class="mt-4 flex items-baseline gap-1">
+                                <span class="text-3xl font-extrabold text-slate-900">$0</span>
+                                <span class="text-sm text-slate-500">/ назавжди</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2">Повний функціонал для особистого планування навчання.</p>
+                            <ul class="mt-5 space-y-2.5 text-sm text-slate-700">
+                                <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> Авто-розбивка робіт на 4 етапи</li>
+                                <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> Попередження про перетин 3+ робіт</li>
+                                <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> Спільний календар групи</li>
+                                <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> Email та Telegram нагадування</li>
+                            </ul>
+                        </div>
+                        <button onclick="switchRole('student')" class="mt-6 w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold text-sm transition">
+                            Відкрити кабінет
+                        </button>
+                    </div>
+
+                    <!-- Тариф 2: Кафедра Pro (Основний ARPU $120/міс) -->
+                    <div class="bg-white p-6 rounded-2xl border-2 border-brand-600 shadow-lg relative flex flex-col justify-between">
+                        <div class="absolute -top-3 right-6 bg-brand-600 text-white text-[11px] font-bold px-3 py-0.5 rounded-full">
+                            Основний тариф (ARPU $120)
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Для кафедр ЗВО (B2B)</span>
+                            <h3 class="text-xl font-bold text-slate-900 mt-1">Кафедра Pro</h3>
+                            <div class="mt-4 flex items-baseline gap-1">
+                                <span class="text-3xl font-extrabold text-slate-900">$120</span>
+                                <span class="text-sm text-slate-500">/ місяць</span>
+                            </div>
+                            <p class="text-xs text-emerald-700 font-medium mt-1">Перший пілотний семестр — безкоштовно!</p>
+                            <ul class="mt-5 space-y-2.5 text-sm text-slate-700">
+                                <li class="flex items-center gap-2"><span class="text-brand-600">✓</span> До 500 студентів та 25 викладачів</li>
+                                <li class="flex items-center gap-2"><span class="text-brand-600">✓</span> Публікація дедлайнів на всю групу</li>
+                                <li class="flex items-center gap-2"><span class="text-brand-600">✓</span> Аналітика «вузьких місць» потоку</li>
+                                <li class="flex items-center gap-2"><span class="text-brand-600">✓</span> Повна відповідність GDPR & DPIA</li>
+                            </ul>
+                        </div>
+                        <button onclick="switchRole('department')" class="mt-6 w-full py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-sm transition">
+                            Замовити пілот для кафедри
+                        </button>
+                    </div>
+
+                    <!-- Тариф 3: Річна ліцензія (Знижка 17% з ЛР 5 та ЛР 15) -->
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-600">Вигода 17% (2 міс у подарунок)</span>
+                            <h3 class="text-xl font-bold text-slate-900 mt-1">Річна / Факультет</h3>
+                            <div class="mt-4 flex items-baseline gap-1">
+                                <span class="text-3xl font-extrabold text-slate-900">$1 200</span>
+                                <span class="text-sm text-slate-500">/ рік</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2">Оптимально для річного бюджетування ЗВО або ІТ-спонсорів.</p>
+                            <ul class="mt-5 space-y-2.5 text-sm text-slate-700">
+                                <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> Усе з тарифу «Кафедра Pro»</li>
+                                <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> Економія $240 на рік (-17%)</li>
+                                <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> Інтеграція з Moodle / Google Classroom</li>
+                                <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span> Персональний менеджер впровадження</li>
+                            </ul>
+                        </div>
+                        <button onclick="showToast('Запит на річний інвойс ($1 200) сформовано! Менеджер звʼяжеться протягом 2 годин.', 'success')" class="mt-6 w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition">
+                            Отримати комерційну пропозицію
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ПІДВАЛ З ПОСИЛАННЯМИ НА GDPR ДОКУМЕНТИ (ЗГІДНО З ЛР 9) -->
+    <footer class="bg-white border-t border-slate-200 py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-800">LabTrack UA</span>
+                <span>© 2026. Прототип для захисту стартап-проєкту.</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-4">
+                <button onclick="showToast('Політика конфіденційності (ст. 13-14 GDPR): збираємо лише email, хеш пароля та навчальні дедлайни.', 'info')" class="hover:text-slate-900 transition">Політика конфіденційності</button>
+                <button onclick="showToast('Умови використання: сервіс призначений для користувачів від 16 років (ст. 8 GDPR).', 'info')" class="hover:text-slate-900 transition">Умови використання (16+)</button>
+                <button onclick="openCookieBanner()" class="text-brand-600 font-medium hover:underline">Налаштування Cookie</button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ===================================================================== -->
+    <!-- МОДАЛЬНЕ ВІКНО 1: ДОДАТИ ЛАБОРАТОРНУ (АВТО-РОЗБИВКА НА 4 ЕТАПИ)        -->
+    <!-- ===================================================================== -->
+    <div id="modal-add-lab" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-fade-in max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Нова навчальна робота</h3>
+                    <p class="text-xs text-slate-500">Система автоматично розрахує 4 етапи та проміжні дати</p>
+                </div>
+                <button onclick="closeAddLabModal()" class="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">✕</button>
+            </div>
+
+            <form id="form-add-lab" onsubmit="handleCreateLab(event)" class="mt-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Дисципліна *</label>
+                    <input type="text" id="input-lab-subject" required placeholder="Наприклад: Веб-технології та веб-дизайн" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Назва / Тема лабораторної або курсової *</label>
+                    <input type="text" id="input-lab-title" required placeholder="Наприклад: Лаб №5 — REST API на Node.js" oninput="previewAutoSteps()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Дата фінальної здачі *</label>
+                        <input type="date" id="input-lab-deadline" required onchange="previewAutoSteps()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Тип роботи</label>
+                        <select id="input-lab-type" onchange="previewAutoSteps()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="lab">Лабораторна робота</option>
+                            <option value="course">Курсова робота</option>
+                            <option value="rgr">Розрахунково-графічна (РГР)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Попередній перегляд автоматично згенерованих етапів -->
+                <div class="bg-brand-50/60 border border-brand-200/80 rounded-xl p-3.5 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-brand-900">✨ Авто-генерація етапів (УТП):</span>
+                        <span class="text-[11px] text-brand-700 font-medium">15% • 40% • 25% • 20%</span>
+                    </div>
+                    <ul id="auto-steps-preview" class="space-y-1.5 text-xs text-slate-700">
+                        <!-- Заповнюється динамічно -->
+                    </ul>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-2">
+                    <button type="button" onclick="closeAddLabModal()" class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100">Скасувати</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white shadow-sm">Створити та розбити на етапи</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- МОДАЛЬНЕ ВІКНО 2: СТВОРИТИ ГРУПОВИЙ ДЕДЛАЙН (ПАНЕЛЬ КАФЕДРИ)           -->
+    <!-- ===================================================================== -->
+    <div id="modal-group-deadline" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-fade-in">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Спільний дедлайн для групи</h3>
+                    <p class="text-xs text-slate-500">Автоматично з'явиться у календарях усіх студентів групи</p>
+                </div>
+                <button onclick="closeGroupDeadlineModal()" class="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">✕</button>
+            </div>
+
+            <form onsubmit="handleCreateGroupDeadline(event)" class="mt-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Оберіть академічну групу</label>
+                    <select id="group-select" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white">
+                        <option value="ІПЗ-31">ІПЗ-31 (32 студенти)</option>
+                        <option value="КН-32">КН-32 (29 студентів)</option>
+                        <option value="ІПЗ-21">ІПЗ-21 (34 студенти)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Дисципліна</label>
+                    <input type="text" id="group-subject" required value="Управління ІТ-проєктами" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Завдання</label>
+                    <input type="text" id="group-task" required value="Лаб №6 — Оцінка ризиків та PERT-аналіз" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Кінцева дата здачі</label>
+                    <input type="date" id="group-date" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm">
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-2">
+                    <button type="button" onclick="closeGroupDeadlineModal()" class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100">Скасувати</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white">Опублікувати для групи</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- GDPR COOKIE-БАНЕР (ЗГІДНО З ЗАВДАННЯМ 9 ЛР 9 — РІВНОЗНАЧНІ КНОПКИ)      -->
+    <!-- ===================================================================== -->
+    <div id="gdpr-cookie-banner" class="fixed bottom-4 left-4 right-4 z-50 max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 animate-fade-in">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="space-y-1.5 text-xs sm:text-sm text-slate-600">
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-slate-900">🍪 Налаштування приватності та Cookie (GDPR)</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">ст. 7 GDPR</span>
+                </div>
+                <p>
+                    Ми використовуємо cookie. Необхідні cookie потрібні для входу й роботи сервісу, тому вони завжди ввімкнені. Аналітичні cookie допомагають нам зрозуміти, які функції корисні, і вмикаються лише з вашої згоди. Рекламних cookie ми не використовуємо.
+                </p>
+                <!-- Панель детального налаштування (прихована за замовчуванням) -->
+                <div id="cookie-details" class="hidden pt-2 mt-2 border-t border-slate-100 flex flex-wrap gap-4">
+                    <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
+                        <input type="checkbox" checked disabled class="rounded text-brand-600">
+                        <span>Необхідні (завжди активні)</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="cookie-analytics-toggle" class="rounded text-brand-600">
+                        <span>Аналітичні cookie (вимкнено за замовчуванням)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Три кнопки однакового розміру та візуальної ваги (вимога GDPR з ЛР 9) -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 shrink-0">
+                <button onclick="saveCookieChoice('all')" class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-300 transition text-center">
+                    Прийняти всі
+                </button>
+                <button onclick="saveCookieChoice('necessary')" class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-300 transition text-center">
+                    Лише необхідні
+                </button>
+                <button onclick="toggleCookieSettings()" id="btn-cookie-customize" class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-300 transition text-center">
+                    Налаштувати
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- JAVASCRIPT ЛОГІКА ІНТЕРАКТИВНОГО ПРОТОТИПУ                             -->
+    <!-- ===================================================================== -->
+    <script>
+        // --- ПОЧАТКОВІ ДАНІ ДЛЯ ДЕМОНСТРАЦІЇ НА ЗАХИСТІ ---
+        let labsData = [
+            {
+                id: 1,
+                subject: "Бази даних та знань",
+                title: "Лаб №4 — Оптимізація SQL-запитів та індекси",
+                deadline: "2026-11-16",
+                source: "Кафедра ПЗ",
+                steps: [
+                    { id: 101, name: "1. Аналіз вимог та налаштування середовища (15%)", date: "2026-11-08", done: true },
+                    { id: 102, name: "2. Реалізація базового коду та індексів (40%)", date: "2026-11-11", done: true },
+                    { id: 103, name: "3. Тестування навантаження та багфікс (25%)", date: "2026-11-14", done: true },
+                    { id: 104, name: "4. Оформлення звіту та захист (20%)", date: "2026-11-16", done: false }
+                ]
+            },
+            {
+                id: 2,
+                subject: "Інженерія програмного забезпечення",
+                title: "Курсова робота — Проєктування SaaS-системи",
+                deadline: "2026-11-24",
+                source: "Особисте",
+                steps: [
+                    { id: 201, name: "1. Аналіз вимог та UML-діаграми (15%)", date: "2026-11-10", done: true },
+                    { id: 202, name: "2. Реалізація базової логіки MVP (40%)", date: "2026-11-17", done: true },
+                    { id: 203, name: "3. Тестування та виправлення багів (25%)", date: "2026-11-21", done: false },
+                    { id: 204, name: "4. Оформлення пояснювальної записки (20%)", date: "2026-11-24", done: false }
+                ]
+            },
+            {
+                id: 3,
+                subject: "Операційні системи",
+                title: "Лаб №3 — Багатопотоковість та м'ютекси",
+                deadline: "2026-11-19",
+                source: "Кафедра ПЗ",
+                steps: [
+                    { id: 301, name: "1. Аналіз вимог та середовище C++ (15%)", date: "2026-11-12", done: true },
+                    { id: 302, name: "2. Реалізація потоків синхронізації (40%)", date: "2026-11-15", done: false },
+                    { id: 303, name: "3. Тестування race conditions (25%)", date: "2026-11-17", done: false },
+                    { id: 304, name: "4. Оформлення звіту та захист (20%)", date: "2026-11-19", done: false }
+                ]
+            },
+            {
+                id: 4,
+                subject: "Алгоритми та структури даних",
+                title: "Лаб №2 — Графи та пошук найкоротшого шляху",
+                deadline: "2026-11-05",
+                source: "Кафедра ПЗ",
+                steps: [
+                    { id: 401, name: "1. Аналіз вимог (15%)", date: "2026-10-28", done: true },
+                    { id: 402, name: "2. Реалізація алгоритму Дейкстри (40%)", date: "2026-11-01", done: true },
+                    { id: 403, name: "3. Тестування на графах (25%)", date: "2026-11-03", done: true },
+                    { id: 404, name: "4. Оформлення звіту та захист (20%)", date: "2026-11-05", done: true }
+                ]
+            }
+        ];
+
+        const groupsData = [
+            { name: "ІПЗ-31", students: 32, progress: 88, status: "У графіку", color: "emerald" },
+            { name: "ІПЗ-32", students: 30, progress: 81, status: "У графіку", color: "emerald" },
+            { name: "КН-32", students: 29, progress: 62, status: "Ризик затримки (Етап 3)", color: "amber" },
+            { name: "ІПЗ-21", students: 34, progress: 91, status: "Випереджають графік", color: "emerald" },
+            { name: "КН-21", students: 31, progress: 54, status: "Потрібна консультація", color: "rose" }
+        ];
+
+        let currentFilter = 'all';
+
+        // --- ПЕРЕМИКАННЯ РОЛЕЙ (B2B2C ДЕМОНСТРАЦІЯ) ---
+        function switchRole(role) {
+            const views = ['student', 'department', 'landing'];
+            views.forEach(v => {
+                const section = document.getElementById(`view-${v}`);
+                const btn = document.getElementById(`btn-role-${v}`);
+                if (v === role) {
+                    section.classList.remove('hidden');
+                    btn.classList.add('tab-active');
+                    btn.classList.remove('tab-inactive');
+                } else {
+                    section.classList.add('hidden');
+                    btn.classList.remove('tab-active');
+                    btn.classList.add('tab-inactive');
+                }
+            });
+
+            if (role === 'landing') {
+                updateDemoCalculator();
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // --- РЕНДЕР КАРТОК ЛАБОРАТОРНИХ РОБІТ ---
+        function renderLabs() {
+            const grid = document.getElementById('labs-grid');
+            grid.innerHTML = '';
+
+            let totalSteps = 0;
+            let completedSteps = 0;
+            let activeLabsCount = 0;
+
+            labsData.forEach(lab => {
+                const doneCount = lab.steps.filter(s => s.done).length;
+                totalSteps += lab.steps.length;
+                completedSteps += doneCount;
+                const isCompleted = doneCount === lab.steps.length;
+                if (!isCompleted) activeLabsCount++;
+            });
+
+            // Оновлення верхніх лічильників
+            const overallPct = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+            document.getElementById('overall-progress-badge').textContent = `${overallPct}%`;
+            document.getElementById('overall-progress-bar').style.width = `${overallPct}%`;
+            document.getElementById('completed-steps-text').textContent = `${completedSteps} з ${totalSteps}`;
+            document.getElementById('active-labs-count').textContent = activeLabsCount;
+
+            const alertBox = document.getElementById('overload-alert');
+            if (activeLabsCount >= 3) {
+                alertBox.classList.remove('hidden');
+            } else {
+                alertBox.classList.add('hidden');
+            }
+
+            // Фільтрація
+            const filteredLabs = labsData.filter(lab => {
+                const isDone = lab.steps.every(s => s.done);
+                if (currentFilter === 'active') return !isDone;
+                if (currentFilter === 'done') return isDone;
+                return true;
+            });
+
+            filteredLabs.forEach(lab => {
+                const doneCount = lab.steps.filter(s => s.done).length;
+                const pct = Math.round((doneCount / lab.steps.length) * 100);
+                const isDone = pct === 100;
+
+                // Визначення статусу дедлайну
+                const today = new Date('2026-11-13');
+                const dlDate = new Date(lab.deadline);
+                const diffDays = Math.ceil((dlDate - today) / (1000 * 60 * 60 * 24));
+
+                let badgeHtml = '';
+                if (isDone) {
+                    badgeHtml = `<span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">✅ Здано</span>`;
+                } else if (diffDays <= 4) {
+                    badgeHtml = `<span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">🔥 Горить дедлайн (${formatDateUkr(lab.deadline)})</span>`;
+                } else {
+                    badgeHtml = `<span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand-50 text-brand-700 border border-brand-200">⏳ У процесі • до ${formatDateUkr(lab.deadline)}</span>`;
+                }
+
+                const stepsHtml = lab.steps.map(step => `
+                    <label class="flex items-center justify-between gap-3 p-2.5 rounded-xl border ${step.done ? 'bg-slate-50/70 border-slate-100' : 'bg-white border-slate-200/80 hover:border-brand-300'} cursor-pointer transition">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" ${step.done ? 'checked' : ''} onchange="toggleStep(${lab.id}, ${step.id})" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 cursor-pointer">
+                            <span class="text-xs sm:text-sm ${step.done ? 'line-through text-slate-400' : 'text-slate-800 font-medium'}">${step.name}</span>
+                        </div>
+                        <span class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 whitespace-nowrap">${formatDateUkr(step.date)}</span>
+                    </label>
+                `).join('');
+
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-2xl border border-slate-200/90 p-5 shadow-sm card-hover flex flex-col justify-between space-y-4";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <span class="text-xs font-semibold text-slate-500">${lab.subject} • <span class="text-brand-600">${lab.source}</span></span>
+                            ${badgeHtml}
+                        </div>
+                        <h3 class="text-base sm:text-lg font-bold text-slate-900">${lab.title}</h3>
+
+                        <!-- Прогрес-бар конкретної роботи -->
+                        <div class="mt-3">
+                            <div class="flex justify-between text-xs font-semibold mb-1">
+                                <span class="text-slate-500">Готовність роботи</span>
+                                <span class="${isDone ? 'text-emerald-600' : 'text-brand-600'}">${pct}%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div class="${isDone ? 'bg-emerald-500' : 'bg-brand-600'} h-2 rounded-full transition-all duration-300" style="width: ${pct}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Список 4 етапів -->
+                        <div class="mt-4 space-y-2">
+                            ${stepsHtml}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // --- ПЕРЕМИКАННЯ ВИКОНАННЯ ЕТАПУ ---
+        function toggleStep(labId, stepId) {
+            const lab = labsData.find(l => l.id === labId);
+            if (!lab) return;
+            const step = lab.steps.find(s => s.id === stepId);
+            if (!step) return;
+
+            step.done = !step.done;
+            renderLabs();
+
+            if (lab.steps.every(s => s.done)) {
+                showToast(`Вітаємо! Роботу «${lab.title}» повністю завершено! 🎉`, 'success');
+            }
+        }
+
+        // --- ФІЛЬТРАЦІЯ РОБІТ ---
+        function filterLabs(filter) {
+            currentFilter = filter;
+            ['all', 'active', 'done'].forEach(f => {
+                const btn = document.getElementById(`filter-${f}`);
+                if (f === filter) {
+                    btn.className = "px-3 py-1.5 rounded-lg bg-slate-900 text-white transition";
+                } else {
+                    btn.className = "px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition";
+                }
+            });
+            renderLabs();
+        }
+
+        // --- АВТОМАТИЧНА РОЗБИВКА НА 4 ЕТАПИ (УТП ПРОЄКТУ) ---
+        function calculateFourSteps(deadlineStr, type = 'lab') {
+            const start = new Date('2026-11-13'); // Поточна дата
+            const end = new Date(deadlineStr);
+            let totalDays = Math.max(4, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+
+            const d1 = addDays(start, Math.max(1, Math.round(totalDays * 0.15)));
+            const d2 = addDays(start, Math.max(2, Math.round(totalDays * 0.55)));
+            const d3 = addDays(start, Math.max(3, Math.round(totalDays * 0.80)));
+            const d4 = deadlineStr;
+
+            const labels = type === 'course' ? [
+                "1. Аналіз предметної області та ТЗ (15%)",
+                "2. Розробка архітектури та коду (40%)",
+                "3. Тестування та налагодження (25%)",
+                "4. Оформлення пояснювальної та захист (20%)"
+            ] : [
+                "1. Аналіз вимог та налаштування середовища (15%)",
+                "2. Реалізація базового коду/логіки (40%)",
+                "3. Тестування та виправлення багів (25%)",
+                "4. Оформлення звіту та захист (20%)"
+            ];
+
+            return [
+                { id: Date.now() + 1, name: labels[0], date: d1, done: false },
+                { id: Date.now() + 2, name: labels[1], date: d2, done: false },
+                { id: Date.now() + 3, name: labels[2], date: d3, done: false },
+                { id: Date.now() + 4, name: labels[3], date: d4, done: false }
+            ];
+        }
+
+        function openAddLabModal() {
+            const defaultDeadline = addDays(new Date('2026-11-13'), 10);
+            document.getElementById('input-lab-deadline').value = defaultDeadline;
+            document.getElementById('modal-add-lab').classList.remove('hidden');
+            previewAutoSteps();
+        }
+
+        function closeAddLabModal() {
+            document.getElementById('modal-add-lab').classList.add('hidden');
+        }
+
+        function previewAutoSteps() {
+            const dl = document.getElementById('input-lab-deadline').value;
+            const type = document.getElementById('input-lab-type').value;
+            if (!dl) return;
+
+            const steps = calculateFourSteps(dl, type);
+            const list = document.getElementById('auto-steps-preview');
+            list.innerHTML = steps.map(s => `
+                <li class="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-brand-100">
+                    <span>${s.name}</span>
+                    <span class="font-semibold text-brand-700">${formatDateUkr(s.date)}</span>
+                </li>
+            `).join('');
+        }
+
+        function handleCreateLab(e) {
+            e.preventDefault();
+            const subject = document.getElementById('input-lab-subject').value.trim();
+            const title = document.getElementById('input-lab-title').value.trim();
+            const deadline = document.getElementById('input-lab-deadline').value;
+            const type = document.getElementById('input-lab-type').value;
+
+            const newLab = {
+                id: Date.now(),
+                subject,
+                title,
+                deadline,
+                source: "Особисте",
+                steps: calculateFourSteps(deadline, type)
+            };
+
+            labsData.unshift(newLab);
+            closeAddLabModal();
+            document.getElementById('form-add-lab').reset();
+            filterLabs('all');
+            showToast(`Роботу «${title}» додано та автоматично розбито на 4 етапи!`, 'success');
+        }
+
+        // --- ЗАПРОШЕННЯ ГРУПИ В 1 КЛІК (REFERRAL МЕХАНІЗМ) ---
+        function inviteGroup() {
+            const inviteLink = "https://labtrack.ua/join/IPZ-31-INVITE";
+            const tempInput = document.createElement("input");
+            tempInput.value = inviteLink;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+
+            showToast("Посилання-запрошення для групи ІПЗ-31 скопійовано! Надішли його в Telegram-чат групи.", 'success');
+        }
+
+        // --- ПАНЕЛЬ КАФЕДРИ: РЕНДЕР ГРУП ТА СТВОРЕННЯ ДЕДЛАЙНУ ---
+        function renderGroupsTable() {
+            const tbody = document.getElementById('groups-table-body');
+            tbody.innerHTML = groupsData.map(g => {
+                const badgeColors = {
+                    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                    amber: "bg-amber-50 text-amber-700 border-amber-200",
+                    rose: "bg-rose-50 text-rose-700 border-rose-200"
+                };
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3.5 px-4 font-bold text-slate-900">${g.name}</td>
+                        <td class="py-3.5 px-4 text-slate-600">${g.students}</td>
+                        <td class="py-3.5 px-4">
+                            <div class="flex items-center gap-2">
+                                <div class="w-24 bg-slate-100 h-2 rounded-full overflow-hidden">
+                                    <div class="bg-brand-600 h-2 rounded-full" style="width: ${g.progress}%"></div>
+                                </div>
+                                <span class="text-xs font-bold text-slate-700">${g.progress}%</span>
+                            </div>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${badgeColors[g.color]}">${g.status}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function openGroupDeadlineModal() {
+            document.getElementById('group-date').value = addDays(new Date('2026-11-13'), 12);
+            document.getElementById('modal-group-deadline').classList.remove('hidden');
+        }
+
+        function closeGroupDeadlineModal() {
+            document.getElementById('modal-group-deadline').classList.add('hidden');
+        }
+
+        function handleCreateGroupDeadline(e) {
+            e.preventDefault();
+            const group = document.getElementById('group-select').value;
+            const subject = document.getElementById('group-subject').value.trim();
+            const task = document.getElementById('group-task').value.trim();
+            const date = document.getElementById('group-date').value;
+
+            // Додаємо дедлайн також у кабінет студента ІПЗ-31, щоб показати синхронізацію B2B -> B2C на захисті!
+            if (group === 'ІПЗ-31') {
+                labsData.unshift({
+                    id: Date.now(),
+                    subject,
+                    title: task,
+                    deadline: date,
+                    source: "Кафедра ПЗ (Нове)",
+                    steps: calculateFourSteps(date, 'lab')
+                });
+                renderLabs();
+            }
+
+            closeGroupDeadlineModal();
+            showToast(`Дедлайн «${task}» опубліковано для групи ${group}! Студенти отримали сповіщення.`, 'success');
+        }
+
+        // --- ДЕМО-КАЛЬКУЛЯТОР НА ЛЕНДІНГУ ---
+        function updateDemoCalculator() {
+            const days = parseInt(document.getElementById('demo-calc-days').value, 10);
+            document.getElementById('demo-calc-days-label').textContent = `${days} днів`;
+
+            const start = new Date('2026-11-13');
+            const endStr = addDays(start, days);
+            const steps = calculateFourSteps(endStr, 'course');
+
+            const container = document.getElementById('demo-calc-result');
+            container.innerHTML = steps.map(s => `
+                <div class="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-none">
+                    <span class="text-slate-700 font-medium">${s.name}</span>
+                    <span class="text-brand-600 font-bold whitespace-nowrap ml-2">${formatDateUkr(s.date)}</span>
+                </div>
+            `).join('');
+        }
+
+        // --- GDPR COOKIE-БАНЕР (ЗГІДНО З ЛР 9) ---
+        function saveCookieChoice(choice) {
+            const banner = document.getElementById('gdpr-cookie-banner');
+            banner.classList.add('hidden');
+            const msg = choice === 'all'
+                ? 'Ви прийняли всі cookie (необхідні + аналітичні). Згоду зафіксовано.'
+                : 'Збережено вибір: активні лише необхідні cookie. Аналітика вимкнена.';
+            showToast(msg, 'info');
+        }
+
+        function toggleCookieSettings() {
+            const details = document.getElementById('cookie-details');
+            const btn = document.getElementById('btn-cookie-customize');
+            if (details.classList.contains('hidden')) {
+                details.classList.remove('hidden');
+                btn.textContent = 'Зберегти вибір';
+            } else {
+                const analyticsEnabled = document.getElementById('cookie-analytics-toggle').checked;
+                saveCookieChoice(analyticsEnabled ? 'all' : 'necessary');
+                details.classList.add('hidden');
+                btn.textContent = 'Налаштувати';
+            }
+        }
+
+        function openCookieBanner() {
+            document.getElementById('gdpr-cookie-banner').classList.remove('hidden');
+        }
+
+        // --- ДОПОМІЖНІ ФУНКЦІЇ ---
+        function addDays(dateObj, days) {
+            const result = new Date(dateObj);
+            result.setDate(result.getDate() + days);
+            return result.toISOString().split('T')[0];
+        }
+
+        function formatDateUkr(isoStr) {
+            const months = ['січ', 'лют', 'бер', 'кві', 'тра', 'чер', 'лип', 'сер', 'вер', 'жов', 'лис', 'гру'];
+            const parts = isoStr.split('-');
+            if (parts.length !== 3) return isoStr;
+            const day = parseInt(parts[2], 10);
+            const month = months[parseInt(parts[1], 10) - 1];
+            return `${day} ${month}`;
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-slate-900 text-white border-slate-700',
+                info: 'bg-white text-slate-800 border-slate-200 shadow-lg'
+            };
+            toast.className = `pointer-events-auto p-3.5 rounded-xl border text-xs sm:text-sm font-medium shadow-xl animate-fade-in flex items-center justify-between gap-3 ${colors[type] || colors.info}`;
+            toast.innerHTML = `
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()" class="opacity-60 hover:opacity-100">✕</button>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                if (toast.parentElement) toast.remove();
+            }, 4500);
+        }
+
+        // Ініціалізація при завантаженні сторінки
+        window.onload = function() {
+            renderLabs();
+            renderGroupsTable();
+            updateDemoCalculator();
+        };
+    </script>
+</body>
+</html>
